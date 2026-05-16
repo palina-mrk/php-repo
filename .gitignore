@@ -1,0 +1,21 @@
+# Local / internal
+CHECKLIST.md
+lead.txt
+
+# IDE
+.idea/
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Secrets & logs
+.env
+.env.*
+*.log
+
+# Temp
+*.bak
+*.tmp
+*~

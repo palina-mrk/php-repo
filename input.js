@@ -1,11 +1,6 @@
 let x_currentDate = new Date();
 x_currentDate.setHours(x_currentDate.getHours() + 24);
 
-
-
-
-
-
 localStorage.getItem('x_currentDate') ?? localStorage.setItem('x_currentDate', x_currentDate.getTime());
 if (localStorage.getItem('x_currentDate') && localStorage.getItem('x_currentDate') < Date.now()) {
     localStorage.clear()
@@ -28,35 +23,6 @@ for (const [key, value] of Array.from(x_parametr.entries())) {
 if (x_parametr.has('_token')) {
     x_parametr.delete('_token')
 }
-
-
-let x_uraParams = '';
-
-let xurlsearchParams = new URLSearchParams(location.search);
-x_parametr.has('fbclid') && x_parametr.get('fbclid') ? x_uraParams += `&fbclid=${x_parametr.get('fbclid')}` : x_uraParams += '';
-x_parametr.has('fbtoken') && x_parametr.get('fbtoken') ? x_uraParams += `&tokenfb=yes` : x_uraParams += '&tokenfb=no';
-xurlsearchParams.has('xevent') && xurlsearchParams.get('xevent') ? x_uraParams += `&xevent=${xurlsearchParams.get('xevent')}` : x_uraParams += ''
-console.log(x_uraParams)
-
-
-document.querySelectorAll(`${x_scrollItem}`).forEach((el) => {
-    el.onclick = (e) => {
-        e.preventDefault()
-        // document.querySelector(`${x_scrollblock}`).scrollIntoView({behavior: "smooth", block: "center"})
-
-        window.scrollTo({
-            behavior: "smooth",
-            top: document.querySelector(`${x_scrollblock}`).getBoundingClientRect().top + window.scrollY
-        })
-    }
-})
-
-
-const updatedQueryString = x_parametr.toString();
-console.log(updatedQueryString);
-
-let mess = 'Compruebe si el nР вЂњРЎвЂќmero de telР вЂњР’В©fono estР вЂњР Р‹ introducido correctamente. Si el nР вЂњРЎвЂќmero se ingresР вЂњРЎвЂ“ correctamente, actualice la pР вЂњР Р‹gina y vuelva a intentarlo.'
-
 
 const LAZY = document.querySelectorAll('img');
 for (let i = 0; i < LAZY.length; i++) {
@@ -86,6 +52,22 @@ function isResultOk(result) {
         (result.response && result.response.status === 'success');
 }
 
+function closeOrderPopup() {
+    const popup = document.querySelector('.ever-popup');
+    if (popup) {
+        popup.classList.remove('show');
+    }
+}
+
+function getOrderErrorMessage(result, fallback) {
+    if (result && typeof result === 'object') {
+        return result.message || result.error || result.msg || fallback;
+    }
+    return fallback;
+}
+
+const ORDER_SUCCESS_MSG = 'Thank you! Your order has been received. Our manager will contact you shortly.';
+const ORDER_ERROR_MSG = 'Could not submit your order. Please try again in a moment.';
 
 if (x_parametr.has('fbpixel')) setCookie('pixel', x_parametr.get('fbpixel'), 24)
 
@@ -105,15 +87,15 @@ let order = localStorage.getItem('order') ?? 0;
 
 function x_strt() {
     document.querySelectorAll('form').forEach((el) => {
-        console.log(el)
+        if (el.dataset.xFormInit) return;
         let btn = el.querySelector('button') ?? el.querySelector('input[type=submit]');
-        let phone = el.phone;
-        let name = el.name;
+        let phone = el.querySelector('input[name="phone"]');
+        let name = el.querySelector('input[name="name"]');
         if (!btn || !phone || !name) {
-            console.log(!btn ? 'no_btn' : !name ? 'no_name' : !phone ? 'no_phone' : '');
             return;
         }
 
+        el.dataset.xFormInit = '1';
 
         el.action = 'api.php';
 
@@ -143,34 +125,30 @@ function x_strt() {
         el.insertAdjacentElement("afterbegin", utm_medium);
 
 
-        phone.setAttribute('maxLength', x_maxLength + x_country_code.length)
-
         btn.setAttribute('disabled', 'true');
         btn.style.opacity = '0.5';
 
-        phone.oninput = function (e) {
-            this.value = this.value.replace(/[^\d]/gi, '');
-            if (!this.value.startsWith(x_country_code)) {
-                this.value = x_country_code + this.value.slice(x_country_code.length - 1);
-            }
-            if (this.value.length >= x_country_code.length + x_minlength && this.value.length <= x_country_code.length + x_maxLength) {
-                btn.style.opacity = '1'
-                btn.removeAttribute('disabled')
+        function updateOrderButtonState() {
+            const nameOk = name.value.trim().length > 0;
+            const phoneOk = phone.value.trim().length > 0;
+
+            if (nameOk && phoneOk) {
+                btn.style.opacity = '1';
+                btn.removeAttribute('disabled');
             } else {
                 btn.style.opacity = '0.5';
-                btn.setAttribute('disabled', 'true')
+                btn.setAttribute('disabled', 'true');
             }
         }
-        name.oninput = function (e) {
+
+        phone.oninput = updateOrderButtonState;
+
+        name.oninput = function () {
             this.value = this.value.replace(/[0-9+]/g, '');
-        }
+            updateOrderButtonState();
+        };
 
-        phone.onclick = function (e) {
-            if (!this.value.startsWith(x_country_code)) {
-                this.value = x_country_code + this.value
-            }
-        }
-
+        updateOrderButtonState();
 
         el.onsubmit = async function (e) {
             e.preventDefault();
@@ -187,50 +165,36 @@ function x_strt() {
 
 
             try {
-                let result = await fetch('api.php', {
+                let response = await fetch('api.php', {
                     method: 'POST',
                     body: new FormData(this)
                 });
 
-                if (!result.ok) {
-                    throw new Error(mess)
+                let result = null;
+                try {
+                    result = await response.json();
+                } catch (_) {}
+
+                if (!response.ok) {
+                    throw new Error(getOrderErrorMessage(result, ORDER_ERROR_MSG));
                 }
 
-                result = await result.json();
-                console.log(result)
                 if (isResultOk(result)) {
                     order++;
-                    localStorage.setItem('order', order)
+                    localStorage.setItem('order', order);
                     localStorage.setItem('phone', phone.value);
                     localStorage.setItem('name', name.value);
-                    const redirectUrl = typeof success !== 'undefined' ? success : '';
 
-                    if (x_parametr.has('xlang') && !redirectUrl) {
-                        const langValues = x_parametr.get('xlang').split(',');
-                        const lang = langValues[0];
-                        const gender = langValues[1];
+                    closeOrderPopup();
+                    el.reset();
+                    updateOrderButtonState();
 
-
-                        if (lang && gender) {
-                            location.href = `${location.protocol}//${location.host}/lander/success/index.php?lang=${lang}&gender=${gender}${x_uraParams}`;
-                        } else if (lang) {
-                            location.href = `${location.protocol}//${location.host}/lander/success/index.php?lang=${lang}${x_uraParams}`;
-                        } else {
-                            location.href = `${location.protocol}//${location.host}/lander/success/index.php?nolang=nolang${x_uraParams}`;
-                        }
-                    } else if (redirectUrl) {
-                        location.href = redirectUrl;
-                    } else {
-                        location.href = `${location.protocol}//${location.host}/lander/success/index.php`;
-
-                    }
-
+                    await createPopup(ORDER_SUCCESS_MSG);
                 } else {
-                    throw new Error(mess)
+                    throw new Error(getOrderErrorMessage(result, ORDER_ERROR_MSG));
                 }
             } catch (err) {
-                console.log(err)
-                await createPopup('Check if the phone number is entered correctly. If the number was entered correctly, refresh the page and try again.');
+                await createPopup(err.message || ORDER_ERROR_MSG);
                 btn.style.opacity = '1';
                 btn.removeAttribute('disabled');
             }
@@ -239,9 +203,17 @@ function x_strt() {
 }
 
 
-(async function prestart() {
-    x_strt()
-})();
+window.x_strt = x_strt;
+
+function bootForms() {
+    x_strt();
+}
+
+if (document.readyState === 'complete') {
+    bootForms();
+} else {
+    document.addEventListener('DOMContentLoaded', bootForms);
+}
 
 
 function domonetka(dom) {
@@ -250,7 +222,6 @@ function domonetka(dom) {
     let [testpaircomID, testpairdam] = dmPairs[0].split(',').map(s => s.trim());
 
     if (!testpaircomID || !testpairdam) {
-        console.log('ret')
         return;
     }
 
@@ -291,22 +262,17 @@ function domonetka(dom) {
     }
 
 
-    history.pushState('1', '', location.href); // убрать +1
+    history.pushState('1', '', location.href); // TODO: remove +1 if back-stack depth is wrong
 
     for (let i = 1; i <= dmPairs.length; i++) {
-        console.log(i + 1);
-        history.pushState(String(i+1), '', location.href);
+        history.pushState(String(i + 1), '', location.href);
     }
 
     window.onpopstate = function (event) {
         let dmPairsReverse = dmPairs.toReversed();
-        console.log(dmPairsReverse);
-
 
         for (let i = 1; i <= dmPairsReverse.length; i++) {
-
             if (event.state === String(i)) {
-                console.log('hrthtrth')
                 document.querySelectorAll('[data-iden]').forEach(f => f.style.display = 'none');
                 const iframe = document.querySelector(`[data-iden="${dmPairsReverse[i-1]}"]`);
 
@@ -350,7 +316,7 @@ async function createPopup(text_popup) {
     popup_main_h1.style.textAlign = 'center';
     popup_main_h1.textContent = text_popup;
 
-    // width: 90%; background: black; color: white; padding: 10px 20px;border: 0; border-radius: 10px; display: block; margin: auto
+    // Button style reference: width 90%; background black; color white; padding 10px 20px; border 0; border-radius 10px; display block; margin auto
 
     let popup_main_btn = document.createElement('button');
     popup_main_btn.style.width = '90%';
@@ -389,10 +355,10 @@ function setCookie(name, value, hours) {
     let expires = "";
     if (hours) {
         const date = new Date();
-        date.setTime(date.getTime() + (hours * 60 * 60 * 1000)); // Р  РЎвЂ”Р  Р’ВµР РЋР вЂљР  Р’ВµР  Р вЂ Р  РЎвЂўР  РўвЂ Р РЋРІР‚РЋР  Р’В°Р РЋР С“Р  РЎвЂўР  Р вЂ  Р  Р вЂ  Р  РЎВР  РЎвЂР  Р’В»Р  Р’В»Р  РЎвЂР РЋР С“Р  Р’ВµР  РЎвЂќР РЋРЎвЂњР  Р вЂ¦Р  РўвЂР РЋРІР‚в„–
-        expires = "; expires=" + date.toUTCString(); // Р РЋРІР‚С›Р  РЎвЂўР РЋР вЂљР  РЎВР  Р’В°Р РЋРІР‚С™Р  РЎвЂР РЋР вЂљР РЋРЎвЂњР  Р’ВµР  РЎВ Р  РўвЂР  Р’В°Р РЋРІР‚С™Р РЋРЎвЂњ Р  Р вЂ  UTC
+        date.setTime(date.getTime() + hours * 60 * 60 * 1000); // add hours in milliseconds
+        expires = '; expires=' + date.toUTCString(); // format expiry date in UTC
     }
-    document.cookie = name + "=" + (value || "") + expires + "; path=/"; // Р  Р’В·Р  Р’В°Р  РЎвЂ”Р  РЎвЂР РЋР С“Р РЋРІР‚в„–Р  Р вЂ Р  Р’В°Р  Р’ВµР  РЎВ Р  РЎвЂќР РЋРЎвЂњР  РЎвЂќР  РЎвЂ
+    document.cookie = name + '=' + (value || '') + expires + '; path=/'; // write cookie
 }
 
 function getCookie(name) {
@@ -425,31 +391,3 @@ function getSubId() {
 }
 
 
-if (window.location.href.includes('/lander/')) {
-    document.body.innerHTML = '';
-
-    const message = document.createElement('div');
-    message.innerHTML = `403 Forbidden<br>You don't have permission to access / on this server.<br>Tg contact:
-    <a href="https://t.me/alicehtbot" target="_blank" style="display:contents;">@alicehtbot</a>`;
-
-    Object.assign(message.style, {
-        position: 'fixed',
-        top: '50%',
-        left: '50%',
-        transform: 'translate(-50%, -50%)',
-        color: 'black',
-        fontSize: '48px',
-        fontWeight: 'bold',
-        width: '100vw',
-        height: '100vh',
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        backgroundColor: 'white',
-        margin: 0,
-        padding: 0,
-        zIndex: 9999,
-    });
-
-    document.body.appendChild(message);
-}
