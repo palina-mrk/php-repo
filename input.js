@@ -24,12 +24,6 @@ if (x_parametr.has('_token')) {
     x_parametr.delete('_token')
 }
 
-const LAZY = document.querySelectorAll('img');
-for (let i = 0; i < LAZY.length; i++) {
-    LAZY[i].setAttribute('loading', 'lazy');
-}
-
-
 function isResultOk(result) {
     return result.status === 'ok' ||
         result.status === 'success' ||
